@@ -9,6 +9,10 @@ requests>=2.31.0
 yt-dlp>=2026.2.4
 google-generativeai>=0.7.0
 curl-cffi>=0.14.0
+python-dotenv>=1.0.0
+pytesseract>=0.3.10
+librosa>=0.10.2
+ffmpeg-python>=0.2.0
 
 # YouTube Upload
 google-api-python-client>=2.100.0

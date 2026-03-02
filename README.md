@@ -1,23 +1,23 @@
-# YT-Short-Clipper
+﻿# YT-Short-Clipper
 
 [![Discord](https://img.shields.io/badge/Join-Discord-5865F2?logo=discord&logoColor=white)](https://s.id/ytsdiscord)
 [![GitHub Stars](https://img.shields.io/github/stars/jipraks/yt-short-clipper?style=social)](https://github.com/jipraks/yt-short-clipper)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-🎬 **Automated YouTube to Short-Form Content Pipeline**
+ðŸŽ¬ **Automated YouTube to Short-Form Content Pipeline**
 
-Transform long-form YouTube videos (podcasts, interviews, vlogs) into engaging short-form content for TikTok, Instagram Reels, and YouTube Shorts — powered by AI.
+Transform long-form YouTube videos (podcasts, interviews, vlogs) into engaging short-form content for TikTok, Instagram Reels, and YouTube Shorts â€” powered by AI.
 
 ---
 
-## � Getting Started
+## ï¿½ Getting Started
 
 ### For Users (Non-Technical)
 
 Download the desktop app and follow the complete setup guide:
 
-- 📖 **[English Guide](GUIDE.md)** - Complete setup guide with screenshots
-- 📖 **[Panduan Indonesia](PANDUAN.md)** - Panduan lengkap dengan screenshot
+- ðŸ“– **[English Guide](GUIDE.md)** - Complete setup guide with screenshots
+- ðŸ“– **[Panduan Indonesia](PANDUAN.md)** - Panduan lengkap dengan screenshot
 
 **What you'll learn:**
 1. How to download and run the app
@@ -34,64 +34,64 @@ If you want to contribute or run from source:
 2. See [Contributing](#-contributing) for contribution guidelines
 3. See [BUILD.md](BUILD.md) for building the desktop app from source
 
-## ✨ Features
+## âœ¨ Features
 
-- **🎥 Auto Download** - Downloads YouTube videos with Indonesian subtitles using yt-dlp
-- **🔍 AI Highlight Detection** - Uses GPT-4 to identify the most engaging segments (60-120 seconds)
-- **✂️ Smart Clipping** - Automatically cuts video at optimal timestamps
-- **📱 Portrait Conversion** - Converts landscape (16:9) to portrait (9:16) with intelligent speaker tracking
-- **🎯 Face Detection** - Two modes available:
+- **ðŸŽ¥ Auto Download** - Downloads YouTube videos with Indonesian subtitles using yt-dlp
+- **ðŸ” AI Highlight Detection** - Uses GPT-4 to identify the most engaging segments (60-120 seconds)
+- **âœ‚ï¸ Smart Clipping** - Automatically cuts video at optimal timestamps
+- **ðŸ“± Portrait Conversion** - Converts landscape (16:9) to portrait (9:16) with intelligent speaker tracking
+- **ðŸŽ¯ Face Detection** - Two modes available:
   - **OpenCV (Fast)** - Crops to largest face, faster processing
   - **MediaPipe (Smart)** - Tracks active speaker via lip movement detection, more accurate but 2-3x slower
-- **🪝 Hook Generation** - Creates attention-grabbing intro scenes with AI-generated text and TTS voiceover
-- **📝 Auto Captions** - Adds CapCut-style word-by-word highlighted captions using Whisper
-- **🖼️ Watermark Support** - Add custom watermark with adjustable position, size, and opacity
-- **📊 SEO Metadata** - Generates optimized titles and descriptions for each clip
+- **ðŸª Hook Generation** - Creates attention-grabbing intro scenes with AI-generated text and TTS voiceover
+- **ðŸ“ Auto Captions** - Adds CapCut-style word-by-word highlighted captions using Whisper
+- **ðŸ–¼ï¸ Watermark Support** - Add custom watermark with adjustable position, size, and opacity
+- **ðŸ“Š SEO Metadata** - Generates optimized titles and descriptions for each clip
 
-## 🏗️ Architecture
+## ðŸ—ï¸ Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        YT-Short-Clipper                         │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌──────────┐    ┌──────────────┐    ┌─────────────┐           │
-│  │ YouTube  │───▶│  Downloader  │───▶│  Subtitle   │           │
-│  │   URL    │    │   (yt-dlp)   │    │   Parser    │           │
-│  └──────────┘    └──────────────┘    └─────────────┘           │
-│                                              │                  │
-│                                              ▼                  │
-│                                    ┌─────────────────┐         │
-│                                    │ Highlight Finder│         │
-│                                    │    (GPT-4)      │         │
-│                                    └─────────────────┘         │
-│                                              │                  │
-│                                              ▼                  │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │                    Video Processing                       │  │
-│  │  ┌────────────┐  ┌────────────┐  ┌────────────────────┐  │  │
-│  │  │   Clipper  │─▶│  Portrait  │─▶│  Hook Generator    │  │  │
-│  │  │  (FFmpeg)  │  │ Converter  │  │  (TTS + Overlay)   │  │  │
-│  │  └────────────┘  └────────────┘  └────────────────────┘  │  │
-│  │                                              │            │  │
-│  │                                              ▼            │  │
-│  │                                    ┌────────────────┐     │  │
-│  │                                    │Caption Generator│    │  │
-│  │                                    │   (Whisper)    │     │  │
-│  │                                    └────────────────┘     │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                                              │                  │
-│                                              ▼                  │
-│                                    ┌─────────────────┐         │
-│                                    │  Output Clips   │         │
-│                                    │  + Metadata     │         │
-│                                    └─────────────────┘         │
-└─────────────────────────────────────────────────────────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚                        YT-Short-Clipper                         â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚                                                                 â”‚
+â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”    â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”    â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”           â”‚
+â”‚  â”‚ YouTube  â”‚â”€â”€â”€â–¶â”‚  Downloader  â”‚â”€â”€â”€â–¶â”‚  Subtitle   â”‚           â”‚
+â”‚  â”‚   URL    â”‚    â”‚   (yt-dlp)   â”‚    â”‚   Parser    â”‚           â”‚
+â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜    â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜    â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜           â”‚
+â”‚                                              â”‚                  â”‚
+â”‚                                              â–¼                  â”‚
+â”‚                                    â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”         â”‚
+â”‚                                    â”‚ Highlight Finderâ”‚         â”‚
+â”‚                                    â”‚    (GPT-4)      â”‚         â”‚
+â”‚                                    â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜         â”‚
+â”‚                                              â”‚                  â”‚
+â”‚                                              â–¼                  â”‚
+â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”‚
+â”‚  â”‚                    Video Processing                       â”‚  â”‚
+â”‚  â”‚  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”  â”‚  â”‚
+â”‚  â”‚  â”‚   Clipper  â”‚â”€â–¶â”‚  Portrait  â”‚â”€â–¶â”‚  Hook Generator    â”‚  â”‚  â”‚
+â”‚  â”‚  â”‚  (FFmpeg)  â”‚  â”‚ Converter  â”‚  â”‚  (TTS + Overlay)   â”‚  â”‚  â”‚
+â”‚  â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â”‚  â”‚
+â”‚  â”‚                                              â”‚            â”‚  â”‚
+â”‚  â”‚                                              â–¼            â”‚  â”‚
+â”‚  â”‚                                    â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”     â”‚  â”‚
+â”‚  â”‚                                    â”‚Caption Generatorâ”‚    â”‚  â”‚
+â”‚  â”‚                                    â”‚   (Whisper)    â”‚     â”‚  â”‚
+â”‚  â”‚                                    â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜     â”‚  â”‚
+â”‚  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜  â”‚
+â”‚                                              â”‚                  â”‚
+â”‚                                              â–¼                  â”‚
+â”‚                                    â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”         â”‚
+â”‚                                    â”‚  Output Clips   â”‚         â”‚
+â”‚                                    â”‚  + Metadata     â”‚         â”‚
+â”‚                                    â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜         â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 ```
 
 ---
 
-## 📋 Requirements (For Development)
+## ðŸ“‹ Requirements (For Development)
 
 ### System Dependencies
 
@@ -130,7 +130,7 @@ See [GUIDE.md](GUIDE.md) or [PANDUAN.md](PANDUAN.md) for detailed API setup inst
 
 ---
 
-## 🚀 Installation (For Development)
+## ðŸš€ Installation (For Development)
 
 > **Note:** This section is for developers who want to run the app from source code. If you're a regular user, please follow the [User Guide](GUIDE.md) or [Panduan Indonesia](PANDUAN.md) instead.
 
@@ -146,6 +146,11 @@ cd yt-short-clipper
 **Windows (using Chocolatey):**
 ```powershell
 choco install ffmpeg yt-dlp
+```
+
+**Windows (one-step bootstrap for PowerShell/Git Bash):**
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/bootstrap_mlbb_windows.ps1
 ```
 
 **macOS (using Homebrew):**
@@ -176,29 +181,94 @@ The app will create a `config.json` file on first run where you can save your AI
 
 ---
 
-## 📁 Project Structure
+
+## MLBB TikTok Mode
+
+You can run the CLI pipeline to generate portrait MLBB clips with:
+- candidate detection from `audio + OCR + motion`
+- LLM ranking/refine
+- auto gameplay/facecam split composition
+- Whisper captions
+- optional TikTok upload
+
+### Quick Setup
+
+```bash
+cp .env.example .env
+bash scripts/bootstrap_mlbb.sh
+```
+
+Windows (PowerShell or Git Bash):
+
+```bash
+powershell -ExecutionPolicy Bypass -File scripts/bootstrap_mlbb_windows.ps1
+```
+
+Set these values in `.env`:
+- `SUMOPOD_API_KEY`
+- `EVENT_IMAGE_PATH`
+- optional `TIKTOK_*` credentials if upload enabled
+
+### Run Commands
+
+Dry-run (full processing, no upload):
+
+```bash
+python main.py --url "https://www.youtube.com/watch?v=VIDEO_ID" --platform tiktok --dry-run
+```
+
+Production (upload enabled from `.env`):
+
+```bash
+python main.py --url "https://www.youtube.com/watch?v=VIDEO_ID" --platform tiktok
+```
+
+### Output Structure
+
+```text
+outputs/<video_id>/
+  source.mp4
+  proxy.mp4
+  audio.wav
+  transcript.json
+  candidates.json
+  selected_clips.json
+  run_config.json
+  clips/
+    clip_01_raw.mp4
+    clip_01_final.mp4
+    clip_01_final.srt
+    ...
+```
+
+### OCR ROI Tuning
+
+- Use `OCR_ROI_ANNOUNCEMENT` and `OCR_ROI_KILL_FEED` in normalized format `x1,y1,x2,y2`.
+- Leave them empty to enable automatic top-HUD ROI scanning.
+
+## ðŸ“ Project Structure
 
 ```
 yt-short-clipper/
-├── app.py                      # Main GUI application
-├── clipper_core.py             # Core processing logic
-├── youtube_uploader.py         # YouTube upload functionality
-├── requirements.txt            # Python dependencies
-├── build.spec                  # PyInstaller build config
-├── config.json                 # App settings (auto-created)
-├── SYSTEM_PROMPT.md            # AI prompt customization guide
-├── BUILD.md                    # Build instructions
-├── DEBUG.md                    # Debugging guide
-├── assets/                     # App icons
-│   ├── icon.png
-│   └── icon.ico
-└── output/                     # Output clips (auto-created)
-    ├── _temp/                  # Temporary files
-    │   ├── source.mp4
-    │   └── source.id.srt
-    └── 20240115-143001/        # Clip folder (timestamp-based)
-        ├── master.mp4          # Final clip
-        └── data.json           # Metadata
+â”œâ”€â”€ app.py                      # Main GUI application
+â”œâ”€â”€ clipper_core.py             # Core processing logic
+â”œâ”€â”€ youtube_uploader.py         # YouTube upload functionality
+â”œâ”€â”€ requirements.txt            # Python dependencies
+â”œâ”€â”€ build.spec                  # PyInstaller build config
+â”œâ”€â”€ config.json                 # App settings (auto-created)
+â”œâ”€â”€ SYSTEM_PROMPT.md            # AI prompt customization guide
+â”œâ”€â”€ BUILD.md                    # Build instructions
+â”œâ”€â”€ DEBUG.md                    # Debugging guide
+â”œâ”€â”€ assets/                     # App icons
+â”‚   â”œâ”€â”€ icon.png
+â”‚   â””â”€â”€ icon.ico
+â””â”€â”€ output/                     # Output clips (auto-created)
+    â”œâ”€â”€ _temp/                  # Temporary files
+    â”‚   â”œâ”€â”€ source.mp4
+    â”‚   â””â”€â”€ source.id.srt
+    â””â”€â”€ 20240115-143001/        # Clip folder (timestamp-based)
+        â”œâ”€â”€ master.mp4          # Final clip
+        â””â”€â”€ data.json           # Metadata
 ```
 
 ### data.json Structure
@@ -207,15 +277,15 @@ Each clip folder contains a `data.json` file with metadata:
 
 ```json
 {
-  "title": "🔥 Momen Kocak Saat Pembully Datang Minta Maaf",
+  "title": "ðŸ”¥ Momen Kocak Saat Pembully Datang Minta Maaf",
   "hook_text": "Mantan pembully TIARA datang ke rumah minta endorse salad buah",
   "start_time": "00:15:23,000",
   "end_time": "00:17:05,000",
   "duration_seconds": 102.0,
   "has_hook": true,
   "has_captions": true,
-  "youtube_title": "🔥 Momen Kocak Saat Pembully Datang Minta Maaf",
-  "youtube_description": "Siapa sangka mantan pembully malah datang minta endorse! 😂 #podcast #viral #fyp",
+  "youtube_title": "ðŸ”¥ Momen Kocak Saat Pembully Datang Minta Maaf",
+  "youtube_description": "Siapa sangka mantan pembully malah datang minta endorse! ðŸ˜‚ #podcast #viral #fyp",
   "youtube_tags": ["shorts", "viral", "podcast"],
   "youtube_url": "https://youtube.com/watch?v=xxxxx",
   "youtube_video_id": "xxxxx"
@@ -224,9 +294,9 @@ Each clip folder contains a `data.json` file with metadata:
 
 ---
 
-## ⚙️ Configuration
+## âš™ï¸ Configuration
 
-All settings can be configured through the GUI Settings page (⚙️ button in the app).
+All settings can be configured through the GUI Settings page (âš™ï¸ button in the app).
 
 For complete setup instructions with screenshots, see:
 - [English Guide](GUIDE.md#5-ai-api-configuration)
@@ -280,7 +350,7 @@ For detailed provider comparison and setup, see: [AI_PROVIDER_SELECTOR.md](AI_PR
 
 ---
 
-## 🔧 How It Works
+## ðŸ”§ How It Works
 
 ### 1. Video Download
 - Uses yt-dlp to download video in best quality (max 1080p)
@@ -324,7 +394,7 @@ For detailed provider comparison and setup, see: [AI_PROVIDER_SELECTOR.md](AI_PR
 
 ---
 
-## 🎨 Caption Styling
+## ðŸŽ¨ Caption Styling
 
 The captions use CapCut-style formatting:
 
@@ -340,7 +410,7 @@ Position: Lower third (350px from bottom)
 
 ---
 
-## � API Usage & Costs 
+## ï¿½ API Usage & Costs 
 
 Estimated OpenAI API costs per video (5 clips):
 
@@ -356,11 +426,11 @@ The desktop app shows real-time token usage and cost estimation during processin
 
 ---
 
-## 🤝 Contributing
+## ðŸ¤ Contributing
 
 Contributions are welcome! We greatly appreciate contributions from anyone.
 
-### 🔨 Building Desktop App from Source
+### ðŸ”¨ Building Desktop App from Source
 
 For developers who want to build the .exe themselves, see the complete guide in [BUILD.md](BUILD.md).
 
@@ -405,27 +475,27 @@ git push origin feature/your-new-feature
 
 | Type | Description |
 |-------|-----------|
-| 🐛 **Bug Report** | Report bugs in the [Issues](../../issues) tab |
-| 💡 **Feature Request** | Request new features in [Issues](../../issues) |
-| 📖 **Documentation** | Improve docs, fix typos, add examples |
-| 🔧 **Code** | Fix bugs, add features, improve performance |
+| ðŸ› **Bug Report** | Report bugs in the [Issues](../../issues) tab |
+| ðŸ’¡ **Feature Request** | Request new features in [Issues](../../issues) |
+| ðŸ“– **Documentation** | Improve docs, fix typos, add examples |
+| ðŸ”§ **Code** | Fix bugs, add features, improve performance |
 
-📚 **Complete guide available in [CONTRIBUTING.md](CONTRIBUTING.md)** - includes Git tutorial for beginners!
+ðŸ“š **Complete guide available in [CONTRIBUTING.md](CONTRIBUTING.md)** - includes Git tutorial for beginners!
 
 ---
 
-## 📝 License
+## ðŸ“ License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## ⚠️ Disclaimer
+## âš ï¸ Disclaimer
 
 - This tool is for personal/educational use only
 - Respect YouTube's Terms of Service
 - Ensure you have rights to use the content you're processing
 - The AI-generated content should be reviewed before publishing
 
-## 🙏 Acknowledgments
+## ðŸ™ Acknowledgments
 
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) - YouTube downloading
 - [OpenAI Whisper](https://github.com/openai/whisper) - Speech recognition
@@ -435,13 +505,13 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## 👨‍💻 Credits
+## ðŸ‘¨â€ðŸ’» Credits
 
-Made with ☕ by **Aji Prakoso** for content creators
+Made with â˜• by **Aji Prakoso** for content creators
 
 | | |
 |---|---|
-| 🎓 | [n8n & Automation eCourse](https://classroom.jipraks.com) |
-| 📸 | [@jipraks on Instagram](https://instagram.com/jipraks) |
-| 🎬 | [Aji Prakoso on YouTube](https://youtube.com/@jipraks) |
-| 🌐 | [About Aji Prakoso](https://www.jipraks.com) |
+| ðŸŽ“ | [n8n & Automation eCourse](https://classroom.jipraks.com) |
+| ðŸ“¸ | [@jipraks on Instagram](https://instagram.com/jipraks) |
+| ðŸŽ¬ | [Aji Prakoso on YouTube](https://youtube.com/@jipraks) |
+| ðŸŒ | [About Aji Prakoso](https://www.jipraks.com) |
