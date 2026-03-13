@@ -55,7 +55,7 @@ class HighlightFinderSettingsPage(BaseProviderSettingsPage):
             font=ctk.CTkFont(size=11)).pack(anchor="w")
         
         ctk.CTkLabel(system_frame, 
-            text="Customize the AI instructions for finding highlights. Use placeholders:\n{num_clips}, {video_context}, {transcript}", 
+            text="Customize the AI instructions for finding highlights. Use placeholders:\n{num_clips}, {video_context}, {analysis_context}, {transcript}", 
             font=ctk.CTkFont(size=9), text_color="gray", justify="left").pack(anchor="w", pady=(2, 5))
         
         # Create scrollable textbox for system message

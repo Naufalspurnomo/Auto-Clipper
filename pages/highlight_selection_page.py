@@ -215,6 +215,50 @@ class HighlightSelectionPage(ctk.CTkFrame):
             if description:
                 ctk.CTkLabel(content, text=description, font=ctk.CTkFont(size=11),
                     text_color="gray", anchor="w", wraplength=650, justify="left").pack(fill="x", pady=(0, 5))
+
+            analysis = highlight.get("analysis", {})
+            analysis_parts = []
+            if analysis.get("clip_type"):
+                analysis_parts.append(f"Type: {analysis['clip_type'].replace('_', ' ').title()}")
+            if analysis.get("emotion"):
+                analysis_parts.append(f"Emotion: {analysis['emotion'].replace('_', ' ').title()}")
+            if analysis.get("editorial_score") is not None:
+                analysis_parts.append(f"Editorial: {analysis['editorial_score']}/10")
+
+            if analysis_parts:
+                ctk.CTkLabel(
+                    content,
+                    text="AI Analysis: " + " | ".join(analysis_parts),
+                    font=ctk.CTkFont(size=10, weight="bold"),
+                    text_color="#89c2ff",
+                    anchor="w",
+                    wraplength=650,
+                    justify="left",
+                ).pack(fill="x", pady=(0, 3))
+
+            editorial_reason = analysis.get("editorial_reason", "")
+            if editorial_reason:
+                ctk.CTkLabel(
+                    content,
+                    text=f"Signals: {editorial_reason}",
+                    font=ctk.CTkFont(size=10),
+                    text_color="#cfcfcf",
+                    anchor="w",
+                    wraplength=650,
+                    justify="left",
+                ).pack(fill="x", pady=(0, 3))
+
+            keywords = analysis.get("keywords", [])
+            if keywords:
+                ctk.CTkLabel(
+                    content,
+                    text=f"Keywords: {', '.join(keywords[:4])}",
+                    font=ctk.CTkFont(size=10),
+                    text_color="#9aa0a6",
+                    anchor="w",
+                    wraplength=650,
+                    justify="left",
+                ).pack(fill="x", pady=(0, 5))
             
             # Bottom row: Timestamp + Duration + Preview button (if ffplay available)
             bottom_row = ctk.CTkFrame(content, fg_color="transparent")

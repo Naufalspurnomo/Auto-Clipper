@@ -8,6 +8,7 @@ import os
 import re
 import threading
 import json
+from collections import Counter
 import cv2
 import numpy as np
 import tempfile
@@ -58,6 +59,63 @@ except ImportError:
 SUBPROCESS_FLAGS = 0
 if sys.platform == "win32":
     SUBPROCESS_FLAGS = subprocess.CREATE_NO_WINDOW
+
+
+STOP_WORDS = {
+    "yang", "dan", "untuk", "dari", "dengan", "karena", "pada", "dalam", "atau",
+    "juga", "kalau", "kalo", "udah", "sudah", "bisa", "bukan", "bikin", "jadi",
+    "gitu", "gini", "kayak", "seperti", "sama", "aja", "banget", "masih", "lebih",
+    "biar", "nih", "nya", "itu", "ini", "apa", "sih", "gua", "gue", "aku", "saya",
+    "kami", "kita", "mereka", "dia", "ia", "loe", "lu", "lo", "you", "the", "and",
+    "for", "that", "this", "with", "have", "from", "your", "are", "was", "were",
+    "but", "not", "too", "very", "just", "into", "about", "jadi", "lah", "pun",
+    "kok", "kan", "deh", "dong", "ya", "iya", "nggak", "enggak", "ga", "gak", "nah",
+    "eh", "oh", "uh", "um", "anu", "jadi", "tetap", "buat", "dulu", "lagi", "bgt",
+}
+
+CONFLICT_CUES = (
+    "masalah", "ribut", "debat", "konflik", "diserang", "nyerang", "dibenci", "panas",
+    "berantem", "sindir", "skandal", "toxic", "gagal", "bangkrut", "krisis", "tegang",
+    "marah", "berani", "keras", "controvers", "drama", "ngamuk", "hancur", "jatuh",
+)
+
+EMOTION_CUES = (
+    "sedih", "nangis", "menangis", "kecewa", "trauma", "takut", "deg-degan", "malu",
+    "bangga", "bahagia", "senang", "capek", "lelah", "frustasi", "shock", "terkejut",
+    "gila", "parah", "sakit", "susah", "terpuruk", "lega", "emosi", "kehilangan",
+)
+
+CONFESSION_CUES = (
+    "jujur", "sebenarnya", "ternyata", "gue pernah", "gua pernah", "aku pernah",
+    "saya pernah", "gue sempet", "gua sempet", "hampir", "ngaku", "pengakuan",
+    "rahasia", "dulu", "waktu itu", "gue takut", "gua takut", "aku takut",
+)
+
+HUMOR_CUES = (
+    "lucu", "ketawa", "ngakak", "becanda", "candaan", "jokes", "punchline", "kocak",
+    "absurd", "receh", "sarkas", "satir",
+)
+
+INSIGHT_CUES = (
+    "pelajaran", "insight", "intinya", "makanya", "ternyata", "kuncinya", "prinsip",
+    "strategi", "cara", "tips", "solusi", "mindset", "alasan", "faktanya", "lesson",
+)
+
+STORY_CUES = (
+    "awalnya", "mulanya", "terus", "lalu", "akhirnya", "habis itu", "setelah itu",
+    "pada saat", "waktu itu", "singkat cerita", "ujungnya", "ternyata", "karena",
+    "sampai", "sejak", "kemudian",
+)
+
+CURIOSITY_CUES = (
+    "kenapa", "gimana", "gimana sih", "bagaimana", "apa jadinya", "serius", "masa",
+    "kok bisa", "ternyata", "justru", "malah", "plot twist", "ga nyangka", "gak nyangka",
+)
+
+FILLER_CUES = (
+    "eee", "ehm", "hmm", "anu", "kayak", "gitu", "gini", "ibaratnya", "maksudnya",
+    "apa ya", "you know", "sort of",
+)
 
 
 class SubtitleNotFoundError(Exception):
@@ -249,6 +307,17 @@ Hindari:
 Jika harus memilih, utamakan EMOSI & KONFLIK dibanding edukasi netral.
 
 ==================================================
+ANALISIS SISTEM (JIKA TERSEDIA)
+===============================
+
+Jika ada blok ANALISIS SISTEM, gunakan itu sebagai peta editorial:
+
+* Prioritaskan time range dengan score editorial tertinggi.
+* Gunakan keyword, emosi, dan tipe clip sebagai petunjuk.
+* Jika transcript ambigu, ANALISIS SISTEM lebih diprioritaskan daripada tebakan.
+* Tetap verifikasi semua timestamp pada transcript asli.
+
+==================================================
 ATURAN DURASI (KRITIS – TIDAK BOLEH DILANGGAR)
 ==============================================
 
@@ -391,6 +460,9 @@ KONTEN
 ======
 
 {video_context}
+
+Analisis Sistem:
+{analysis_context}
 
 Transcript:
 {transcript}"""
@@ -1191,6 +1263,573 @@ Transcript:
             lines.append(f"[{start} - {end}] {clean_text}")
         
         return "\n".join(lines)
+
+    def parse_transcript_segments(self, transcript: str) -> list:
+        """Parse transcript lines in [start - end] text format into structured segments."""
+        pattern = re.compile(
+            r"^\[(\d{2}:\d{2}:\d{2},\d{3})\s*-\s*(\d{2}:\d{2}:\d{2},\d{3})\]\s*(.+)$",
+            re.MULTILINE,
+        )
+
+        segments = []
+        for match in pattern.finditer(transcript or ""):
+            start_time, end_time, text = match.groups()
+            clean_text = re.sub(r"\s+", " ", text).strip()
+            if not clean_text:
+                continue
+
+            try:
+                start_seconds = self.parse_timestamp(start_time)
+                end_seconds = self.parse_timestamp(end_time)
+            except Exception:
+                continue
+
+            if end_seconds <= start_seconds:
+                continue
+
+            speaker = self._extract_speaker_name(clean_text)
+            segments.append(
+                {
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "start_seconds": start_seconds,
+                    "end_seconds": end_seconds,
+                    "text": clean_text,
+                    "speaker": speaker,
+                }
+            )
+
+        return segments
+
+    def _extract_speaker_name(self, text: str) -> str:
+        """Extract a likely speaker name from transcript text."""
+        match = re.match(
+            r"^\s*([A-Z][A-Za-z0-9'`.-]*(?:\s+[A-Z][A-Za-z0-9'`.-]*){0,2})\s*:\s+",
+            text or "",
+        )
+        if not match:
+            return ""
+
+        speaker = match.group(1).strip()
+        if len(speaker.split()) > 3:
+            return ""
+        return speaker
+
+    def _tokenize_text(self, text: str) -> list:
+        return re.findall(r"[A-Za-z0-9']+", (text or "").lower())
+
+    def _count_phrase_hits(self, lower_text: str, phrases: tuple) -> int:
+        total = 0
+        for phrase in phrases:
+            if " " in phrase:
+                total += lower_text.count(phrase)
+            else:
+                total += len(re.findall(rf"\b{re.escape(phrase)}\b", lower_text))
+        return total
+
+    def _limit_text(self, text: str, max_chars: int = None, max_words: int = None) -> str:
+        text = re.sub(r"\s+", " ", text or "").strip(" \t\r\n-:;,.")
+        if max_words:
+            text = " ".join(text.split()[:max_words])
+        if max_chars and len(text) > max_chars:
+            clipped = text[:max_chars].rstrip()
+            if " " in clipped:
+                clipped = clipped.rsplit(" ", 1)[0]
+            text = clipped
+        return text.strip(" \t\r\n-:;,.")
+
+    def _collect_segments_in_range(self, segments: list, start_seconds: float, end_seconds: float) -> dict:
+        selected = [
+            seg for seg in segments
+            if seg["end_seconds"] > start_seconds and seg["start_seconds"] < end_seconds
+        ]
+        if not selected:
+            return {
+                "segments": [],
+                "text": "",
+                "duration": 0.0,
+                "speakers": [],
+                "start_seconds": start_seconds,
+                "end_seconds": end_seconds,
+                "start_time": self._seconds_to_srt_timestamp(start_seconds),
+                "end_time": self._seconds_to_srt_timestamp(end_seconds),
+            }
+
+        actual_start = selected[0]["start_seconds"]
+        actual_end = selected[-1]["end_seconds"]
+        speakers = [seg["speaker"] for seg in selected if seg.get("speaker")]
+        text = " ".join(seg["text"] for seg in selected)
+
+        return {
+            "segments": selected,
+            "text": text,
+            "duration": max(0.0, actual_end - actual_start),
+            "speakers": list(dict.fromkeys(speakers)),
+            "start_seconds": actual_start,
+            "end_seconds": actual_end,
+            "start_time": selected[0]["start_time"],
+            "end_time": selected[-1]["end_time"],
+        }
+
+    def _score_transcript_excerpt(self, text: str, duration: float, speakers: list = None) -> dict:
+        """Score an excerpt so highlight selection is not fully dependent on the LLM."""
+        speakers = speakers or []
+        lower_text = (text or "").lower()
+        tokens = [
+            token for token in self._tokenize_text(text)
+            if len(token) > 2 and token not in STOP_WORDS and not token.isdigit()
+        ]
+        token_counter = Counter(tokens)
+
+        conflict_hits = self._count_phrase_hits(lower_text, CONFLICT_CUES)
+        emotion_hits = self._count_phrase_hits(lower_text, EMOTION_CUES)
+        confession_hits = self._count_phrase_hits(lower_text, CONFESSION_CUES)
+        humor_hits = self._count_phrase_hits(lower_text, HUMOR_CUES)
+        insight_hits = self._count_phrase_hits(lower_text, INSIGHT_CUES)
+        story_hits = self._count_phrase_hits(lower_text, STORY_CUES)
+        curiosity_hits = self._count_phrase_hits(lower_text, CURIOSITY_CUES) + lower_text.count("?")
+        filler_hits = self._count_phrase_hits(lower_text, FILLER_CUES)
+
+        pace = len(tokens) / max(duration, 1.0)
+        pace_bonus = min(1.2, pace / 2.2)
+        duration_bonus = max(0.0, 1.5 - (abs(duration - 90.0) / 28.0))
+        speaker_bonus = min(0.6, len(set(speakers)) * 0.2)
+
+        editorial_score = (
+            3.0
+            + conflict_hits * 0.45
+            + emotion_hits * 0.35
+            + confession_hits * 0.6
+            + humor_hits * 0.3
+            + insight_hits * 0.28
+            + story_hits * 0.2
+            + curiosity_hits * 0.18
+            + pace_bonus
+            + duration_bonus
+            + speaker_bonus
+            - filler_hits * 0.25
+        )
+        editorial_score = round(max(1.0, min(10.0, editorial_score)), 1)
+
+        clip_type_scores = {
+            "confession": confession_hits * 1.3 + emotion_hits * 0.5,
+            "controversy": conflict_hits * 1.2 + curiosity_hits * 0.3,
+            "humor": humor_hits * 1.4 + curiosity_hits * 0.2,
+            "insight": insight_hits * 1.0 + story_hits * 0.3,
+            "story": story_hits * 0.9 + emotion_hits * 0.2,
+        }
+        clip_type = max(clip_type_scores, key=clip_type_scores.get)
+        if clip_type_scores[clip_type] <= 0:
+            clip_type = "conversation"
+
+        emotion_scores = {
+            "tension": conflict_hits + emotion_hits * 0.4,
+            "vulnerable": confession_hits + emotion_hits * 0.7,
+            "curiosity": curiosity_hits + insight_hits * 0.2,
+            "humor": humor_hits * 1.2,
+            "insightful": insight_hits + story_hits * 0.2,
+        }
+        emotion = max(emotion_scores, key=emotion_scores.get)
+        if emotion_scores[emotion] <= 0:
+            emotion = "neutral"
+
+        keywords = [word for word, _ in token_counter.most_common(4)]
+        speaker_candidates = list(dict.fromkeys(speakers))[:3]
+
+        reason_parts = []
+        if conflict_hits:
+            reason_parts.append("konflik tinggi")
+        if confession_hits:
+            reason_parts.append("pengakuan personal")
+        if emotion_hits:
+            reason_parts.append("emosi kuat")
+        if story_hits >= 2:
+            reason_parts.append("alur terasa lengkap")
+        if humor_hits:
+            reason_parts.append("puncline terasa jelas")
+        if insight_hits and not conflict_hits:
+            reason_parts.append("insight cukup tajam")
+        if curiosity_hits:
+            reason_parts.append("hook memancing penasaran")
+        if not reason_parts:
+            reason_parts.append("ritme bicara cukup padat")
+
+        return {
+            "editorial_score": editorial_score,
+            "clip_type": clip_type,
+            "emotion": emotion,
+            "keywords": keywords,
+            "speaker_candidates": speaker_candidates,
+            "editorial_reason": ", ".join(reason_parts[:3]),
+            "signals": {
+                "conflict": conflict_hits,
+                "emotion": emotion_hits,
+                "confession": confession_hits,
+                "humor": humor_hits,
+                "insight": insight_hits,
+                "story": story_hits,
+                "curiosity": curiosity_hits,
+                "filler": filler_hits,
+            },
+        }
+
+    def _build_candidate_windows(
+        self,
+        segments: list,
+        target_duration: int = 90,
+        stride: int = 30,
+        min_duration: int = 60,
+        limit: int = 18,
+    ) -> list:
+        """Build time-based windows to guide the LLM and recover from weak outputs."""
+        if not segments:
+            return []
+
+        video_start = segments[0]["start_seconds"]
+        video_end = segments[-1]["end_seconds"]
+        raw_windows = []
+
+        window_start = video_start
+        last_possible_start = max(video_start, video_end - min_duration)
+        while window_start <= last_possible_start:
+            excerpt = self._collect_segments_in_range(
+                segments,
+                window_start,
+                min(window_start + target_duration, video_end),
+            )
+            if excerpt["segments"] and excerpt["duration"] >= min_duration:
+                analysis = self._score_transcript_excerpt(
+                    excerpt["text"],
+                    excerpt["duration"],
+                    excerpt["speakers"],
+                )
+                raw_windows.append(
+                    {
+                        **excerpt,
+                        "analysis": analysis,
+                    }
+                )
+            window_start += stride
+
+        raw_windows.sort(
+            key=lambda item: (
+                item["analysis"]["editorial_score"],
+                item["duration"],
+            ),
+            reverse=True,
+        )
+
+        ranked = []
+        for window in raw_windows:
+            overlap = any(
+                self._overlap_ratio(
+                    window["start_seconds"],
+                    window["end_seconds"],
+                    kept["start_seconds"],
+                    kept["end_seconds"],
+                ) >= 0.65
+                for kept in ranked
+            )
+            if overlap:
+                continue
+            ranked.append(window)
+            if len(ranked) >= limit:
+                break
+
+        return ranked
+
+    def _build_analysis_context(self, segments: list, video_info: dict, num_clips: int) -> dict:
+        """Create compact editorial context for the LLM prompt and local ranking."""
+        if not segments:
+            return {
+                "summary_text": "Tidak ada analisis tambahan.",
+                "windows": [],
+                "keywords": [],
+                "speakers": [],
+            }
+
+        total_duration = max(0.0, segments[-1]["end_seconds"] - segments[0]["start_seconds"])
+        transcript_text = " ".join(seg["text"] for seg in segments)
+        speakers = [seg["speaker"] for seg in segments if seg.get("speaker")]
+        speaker_counts = Counter(speakers)
+        top_speakers = [name for name, _ in speaker_counts.most_common(5)]
+
+        all_tokens = [
+            token for token in self._tokenize_text(transcript_text)
+            if len(token) > 2 and token not in STOP_WORDS and not token.isdigit()
+        ]
+        top_keywords = [word for word, _ in Counter(all_tokens).most_common(8)]
+        candidate_windows = self._build_candidate_windows(
+            segments,
+            target_duration=90,
+            stride=30 if total_duration > 180 else 20,
+            min_duration=60,
+            limit=max(12, num_clips * 3),
+        )
+
+        summary_lines = [
+            f"- Durasi transcript: {total_duration / 60:.1f} menit",
+            f"- Kandidat speaker utama: {', '.join(top_speakers[:4]) or 'tidak terdeteksi'}",
+            f"- Topik dominan: {', '.join(top_keywords[:6]) or 'tidak cukup data'}",
+        ]
+
+        if video_info and video_info.get("title"):
+            summary_lines.append(f"- Konteks judul video: {video_info['title'][:120]}")
+
+        if candidate_windows:
+            summary_lines.append("- Kandidat momen editorial terbaik:")
+            for index, window in enumerate(candidate_windows[:6], 1):
+                analysis = window["analysis"]
+                start_display = window["start_time"].split(",")[0]
+                end_display = window["end_time"].split(",")[0]
+                keywords = ", ".join(analysis["keywords"][:3]) or "n/a"
+                summary_lines.append(
+                    f"  {index}. {start_display}-{end_display} | "
+                    f"{analysis['clip_type']} | score {analysis['editorial_score']}/10 | "
+                    f"{analysis['editorial_reason']} | keyword: {keywords}"
+                )
+
+        return {
+            "summary_text": "\n".join(summary_lines),
+            "windows": candidate_windows,
+            "keywords": top_keywords,
+            "speakers": top_speakers,
+        }
+
+    def _extract_json_array(self, result: str) -> str:
+        """Extract the first JSON array from a model response."""
+        result = (result or "").strip()
+        if result.startswith("```"):
+            result = re.sub(r"^```(?:json)?\s*", "", result)
+            result = re.sub(r"\s*```$", "", result)
+
+        first_bracket = result.find("[")
+        last_bracket = result.rfind("]")
+        if first_bracket != -1 and last_bracket != -1 and last_bracket > first_bracket:
+            return result[first_bracket:last_bracket + 1]
+        return result
+
+    def _normalize_highlight_object(self, raw_highlight: dict) -> dict:
+        """Normalize model output into the shape expected by the rest of the pipeline."""
+        if not isinstance(raw_highlight, dict):
+            return {}
+
+        description = raw_highlight.get("description") or raw_highlight.get("reason") or ""
+        title = raw_highlight.get("title") or raw_highlight.get("hook_text") or description or "Highlight"
+        hook_text = raw_highlight.get("hook_text") or title
+
+        try:
+            virality_score = int(float(raw_highlight.get("virality_score", 5)))
+        except Exception:
+            virality_score = 5
+        virality_score = max(1, min(10, virality_score))
+
+        return {
+            "start_time": str(raw_highlight.get("start_time", "")).strip(),
+            "end_time": str(raw_highlight.get("end_time", "")).strip(),
+            "title": self._limit_text(title, max_chars=60, max_words=12) or "Highlight",
+            "description": self._limit_text(description or title, max_chars=150, max_words=28) or "Highlight menarik",
+            "virality_score": virality_score,
+            "hook_text": self._limit_text(hook_text, max_chars=80, max_words=15) or "Hook belum tersedia",
+        }
+
+    def _find_nearest_segment_index(self, segments: list, target_seconds: float, use_end: bool = False) -> int:
+        if not segments:
+            return 0
+
+        best_index = 0
+        best_distance = float("inf")
+        for index, segment in enumerate(segments):
+            point = segment["end_seconds"] if use_end else segment["start_seconds"]
+            if segment["start_seconds"] <= target_seconds <= segment["end_seconds"]:
+                return index
+
+            distance = abs(point - target_seconds)
+            if distance < best_distance:
+                best_distance = distance
+                best_index = index
+        return best_index
+
+    def _repair_highlight_boundaries(self, highlight: dict, segments: list) -> dict:
+        """Snap AI timestamps to transcript segments and fix durations."""
+        try:
+            start_seconds = self.parse_timestamp(highlight["start_time"])
+            end_seconds = self.parse_timestamp(highlight["end_time"])
+        except Exception:
+            return {}
+
+        if end_seconds <= start_seconds or not segments:
+            return {}
+
+        start_index = self._find_nearest_segment_index(segments, start_seconds, use_end=False)
+        end_index = self._find_nearest_segment_index(segments, end_seconds, use_end=True)
+        end_index = max(start_index, end_index)
+        last_index = len(segments) - 1
+
+        def current_duration() -> float:
+            return segments[end_index]["end_seconds"] - segments[start_index]["start_seconds"]
+
+        while current_duration() < 58 and (start_index > 0 or end_index < last_index):
+            if start_index > 0:
+                start_index -= 1
+            if current_duration() < 58 and end_index < last_index:
+                end_index += 1
+
+        while current_duration() > 120 and end_index > start_index:
+            left_score = self._score_transcript_excerpt(
+                segments[start_index]["text"],
+                max(1.0, segments[start_index]["end_seconds"] - segments[start_index]["start_seconds"]),
+                [segments[start_index].get("speaker")] if segments[start_index].get("speaker") else [],
+            )["editorial_score"]
+            right_score = self._score_transcript_excerpt(
+                segments[end_index]["text"],
+                max(1.0, segments[end_index]["end_seconds"] - segments[end_index]["start_seconds"]),
+                [segments[end_index].get("speaker")] if segments[end_index].get("speaker") else [],
+            )["editorial_score"]
+
+            if left_score <= right_score and start_index < end_index:
+                start_index += 1
+            else:
+                end_index -= 1
+
+        duration = current_duration()
+        if duration <= 0:
+            return {}
+
+        highlight["start_time"] = segments[start_index]["start_time"]
+        highlight["end_time"] = segments[end_index]["end_time"]
+        highlight["duration_seconds"] = round(duration, 1)
+        return highlight
+
+    def _compose_highlight_analysis(self, highlight: dict, segments: list, candidate_windows: list) -> dict:
+        try:
+            start_seconds = self.parse_timestamp(highlight["start_time"])
+            end_seconds = self.parse_timestamp(highlight["end_time"])
+        except Exception:
+            return {}
+
+        excerpt = self._collect_segments_in_range(segments, start_seconds, end_seconds)
+        if not excerpt["segments"]:
+            return {}
+
+        analysis = self._score_transcript_excerpt(
+            excerpt["text"],
+            excerpt["duration"],
+            excerpt["speakers"],
+        )
+
+        best_overlap = 0.0
+        best_window_score = 0.0
+        for window in candidate_windows:
+            overlap = self._overlap_ratio(
+                excerpt["start_seconds"],
+                excerpt["end_seconds"],
+                window["start_seconds"],
+                window["end_seconds"],
+            )
+            if overlap > best_overlap:
+                best_overlap = overlap
+                best_window_score = window["analysis"]["editorial_score"]
+
+        if best_overlap >= 0.35:
+            analysis["editorial_score"] = round(
+                max(analysis["editorial_score"], best_window_score * 0.95),
+                1,
+            )
+
+        if analysis["speaker_candidates"] and ":" not in highlight["hook_text"]:
+            speaker = analysis["speaker_candidates"][0]
+            highlight["hook_text"] = self._limit_text(
+                f"{speaker}: {highlight['hook_text']}",
+                max_chars=80,
+                max_words=15,
+            )
+
+        selection_score = round(
+            highlight.get("virality_score", 5) * 0.55 + analysis["editorial_score"] * 0.45,
+            2,
+        )
+
+        highlight["analysis"] = analysis
+        highlight["selection_score"] = selection_score
+        return highlight
+
+    def _overlap_ratio(self, start_a: float, end_a: float, start_b: float, end_b: float) -> float:
+        intersection = max(0.0, min(end_a, end_b) - max(start_a, start_b))
+        if intersection <= 0:
+            return 0.0
+        duration_a = max(1e-6, end_a - start_a)
+        duration_b = max(1e-6, end_b - start_b)
+        return intersection / min(duration_a, duration_b)
+
+    def _dedupe_highlights(self, highlights: list, limit: int) -> list:
+        ranked = sorted(
+            highlights,
+            key=lambda item: (
+                item.get("selection_score", item.get("virality_score", 0)),
+                item.get("analysis", {}).get("editorial_score", 0),
+                item.get("duration_seconds", 0),
+            ),
+            reverse=True,
+        )
+
+        unique = []
+        for highlight in ranked:
+            try:
+                start_seconds = self.parse_timestamp(highlight["start_time"])
+                end_seconds = self.parse_timestamp(highlight["end_time"])
+            except Exception:
+                continue
+
+            has_overlap = any(
+                self._overlap_ratio(
+                    start_seconds,
+                    end_seconds,
+                    self.parse_timestamp(saved["start_time"]),
+                    self.parse_timestamp(saved["end_time"]),
+                ) >= 0.55
+                for saved in unique
+            )
+            if has_overlap:
+                continue
+
+            unique.append(highlight)
+            if len(unique) >= limit:
+                break
+
+        return unique
+
+    def _build_fallback_highlight(self, window: dict) -> dict:
+        analysis = window["analysis"]
+        speaker = analysis["speaker_candidates"][0] if analysis["speaker_candidates"] else ""
+        snippet = re.split(r"[.!?]", window["text"])[0]
+        snippet = self._limit_text(snippet, max_chars=60, max_words=12) or "Momen kuat dari percakapan ini"
+
+        if speaker and speaker.lower() not in snippet.lower():
+            title = self._limit_text(f"{speaker}: {snippet}", max_chars=60, max_words=12)
+        else:
+            title = snippet
+
+        hook_text = title
+        description = analysis["editorial_reason"].capitalize()
+        if analysis["keywords"]:
+            description = self._limit_text(
+                f"{description}; keyword: {', '.join(analysis['keywords'][:3])}",
+                max_chars=150,
+                max_words=26,
+            )
+
+        return {
+            "start_time": window["start_time"],
+            "end_time": window["end_time"],
+            "title": title or "Highlight",
+            "description": description or "Clip ini punya sinyal editorial yang kuat",
+            "virality_score": max(1, min(10, int(round(analysis["editorial_score"])))),
+            "hook_text": self._limit_text(hook_text, max_chars=80, max_words=15) or "Highlight",
+            "duration_seconds": round(window["duration"], 1),
+            "analysis": analysis,
+            "selection_score": round(analysis["editorial_score"], 2),
+        }
     
     def transcribe_full_video(self, video_path: str) -> str:
         """Transcribe full video audio using Whisper API (Caption Maker).
@@ -1540,6 +2179,7 @@ Transcript:
     def find_highlights(self, transcript: str, video_info: dict, num_clips: int) -> list:
         """Find highlights using GPT or Gemini"""
         self.log(f"[2/4] Finding highlights (using {self.model})...")
+        return self._find_highlights_enhanced(transcript, video_info, num_clips)
         
         request_clips = num_clips + 3
         
@@ -1679,6 +2319,189 @@ Transcript:
             self.log(f"   Consider using a better AI model or adjusting the prompt.")
         
         return valid[:num_clips]
+
+    def _find_highlights_enhanced(self, transcript: str, video_info: dict, num_clips: int) -> list:
+        """Enhanced highlight pipeline with transcript intelligence and local reranking."""
+        request_clips = num_clips + 4
+        transcript_segments = self.parse_transcript_segments(transcript)
+        analysis_context = self._build_analysis_context(transcript_segments, video_info, request_clips)
+
+        if transcript_segments:
+            self.log(
+                f"  Transcript intelligence ready: {len(transcript_segments)} segments, "
+                f"{len(analysis_context['windows'])} candidate windows"
+            )
+
+        video_context = ""
+        if video_info:
+            video_context = f"""INFO VIDEO:
+- Judul: {video_info.get('title', 'Unknown')}
+- Channel: {video_info.get('channel', 'Unknown')}
+- Deskripsi: {video_info.get('description', '')[:500]}"""
+
+        prompt = self.system_prompt.replace("{num_clips}", str(request_clips))
+        prompt = prompt.replace("{video_context}", video_context)
+        prompt = prompt.replace("{analysis_context}", analysis_context["summary_text"])
+        prompt = prompt.replace("{transcript}", transcript)
+
+        if "{analysis_context}" in self.system_prompt and "{analysis_context}" in prompt:
+            self.log("  Warning: {analysis_context} placeholder not replaced - check your system prompt")
+        elif "{analysis_context}" not in self.system_prompt and analysis_context["summary_text"]:
+            prompt = f"{prompt}\n\nANALISIS SISTEM TAMBAHAN:\n{analysis_context['summary_text']}\n"
+
+        if "{transcript}" in self.system_prompt and "{transcript}" in prompt:
+            self.log("  Warning: {transcript} placeholder not replaced - check your system prompt")
+        if "{num_clips}" in self.system_prompt and "{num_clips}" in prompt:
+            self.log("  Warning: {num_clips} placeholder not replaced - check your system prompt")
+
+        if "gemini" in self.model.lower() and GOOGLE_GENAI_AVAILABLE:
+            result = self._call_gemini_api(prompt)
+        else:
+            try:
+                response = self.highlight_client.chat.completions.create(
+                    model=self.model,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=self.temperature,
+                )
+
+                if not response:
+                    raise Exception("API returned empty response")
+
+                if not hasattr(response, "choices") or not response.choices:
+                    self.log(f"  Warning: unexpected API response structure: {type(response)}")
+                    self.log(f"  Response attributes: {dir(response)}")
+                    raise Exception(
+                        "API response missing 'choices' field.\n\n"
+                        "This usually happens with custom API providers that don't follow OpenAI format.\n\n"
+                        "Please check:\n"
+                        "1. API key is valid and has credits\n"
+                        "2. Base URL is correct for your provider\n"
+                        "3. Model name is supported by your provider\n"
+                        "4. Provider follows OpenAI-compatible API format"
+                    )
+
+                if not response.choices[0].message or not response.choices[0].message.content:
+                    raise Exception(
+                        "API returned empty content.\n\n"
+                        "Possible causes:\n"
+                        "1. Model refused to generate content (content filter)\n"
+                        "2. API quota exceeded\n"
+                        "3. Model doesn't support this type of request"
+                    )
+
+                if hasattr(response, "usage") and response.usage:
+                    self.report_tokens(response.usage.prompt_tokens, response.usage.completion_tokens, 0, 0)
+
+                result = response.choices[0].message.content.strip()
+
+            except Exception as e:
+                if "API response missing" in str(e) or "API returned empty" in str(e):
+                    raise
+
+                self.log(f"  API Error: {e}")
+                raise Exception(
+                    f"Failed to get highlights from AI model.\n\n"
+                    f"Error: {str(e)}\n\n"
+                    f"Please check:\n"
+                    f"1. API key is valid: {self.highlight_client.api_key[:20]}...\n"
+                    f"2. Base URL is correct: {self.highlight_client.base_url}\n"
+                    f"3. Model exists: {self.model}\n"
+                    f"4. You have sufficient credits/quota"
+                )
+
+        self.log(f"  Raw AI response (first 500 chars):\n{result[:500]}")
+
+        result = self._extract_json_array(result)
+        try:
+            highlights = json.loads(result)
+        except json.JSONDecodeError as e:
+            self.log(f"\nJSON Parse Error: {e}")
+            self.log(f"\nFull GPT Response:\n{result}")
+            self.log(f"\nError position: line {e.lineno}, column {e.colno}")
+            raise Exception(f"Failed to parse GPT response as JSON: {e}\n\nFull response logged above.")
+
+        if not isinstance(highlights, list):
+            raise Exception("AI response must be a JSON array of highlight objects.")
+
+        processed = []
+        for raw_highlight in highlights:
+            highlight = self._normalize_highlight_object(raw_highlight)
+            if not highlight.get("start_time") or not highlight.get("end_time"):
+                self.log("  Warning: skipped highlight with missing timestamps")
+                continue
+
+            highlight = self._repair_highlight_boundaries(highlight, transcript_segments)
+            if not highlight:
+                self.log("  Warning: skipped highlight with invalid or unrepairable timestamps")
+                continue
+
+            duration = highlight.get("duration_seconds", 0)
+            if not 58 <= duration <= 120:
+                self.log(f"  Skipped '{highlight['title']}' ({duration:.0f}s) after duration repair")
+                continue
+
+            highlight = self._compose_highlight_analysis(
+                highlight,
+                transcript_segments,
+                analysis_context["windows"],
+            )
+            if not highlight:
+                continue
+
+            analysis = highlight.get("analysis", {})
+            self.log(
+                f"  Accepted: {highlight['title']} ({duration:.0f}s) "
+                f"[AI {highlight['virality_score']}/10 | editorial {analysis.get('editorial_score', 0)}/10]"
+            )
+            processed.append(highlight)
+
+        deduped = self._dedupe_highlights(processed, num_clips)
+
+        if len(deduped) < num_clips:
+            for window in analysis_context["windows"]:
+                fallback = self._build_fallback_highlight(window)
+                fallback = self._repair_highlight_boundaries(fallback, transcript_segments)
+                if not fallback:
+                    continue
+
+                fallback = self._compose_highlight_analysis(
+                    fallback,
+                    transcript_segments,
+                    analysis_context["windows"],
+                )
+                if not fallback:
+                    continue
+
+                candidate_pool = deduped + [fallback]
+                updated = self._dedupe_highlights(candidate_pool, num_clips)
+                if len(updated) == len(deduped):
+                    continue
+
+                deduped = updated
+                self.log(
+                    f"  Fallback candidate added: {fallback['title']} "
+                    f"({fallback['duration_seconds']:.0f}s)"
+                )
+                if len(deduped) >= num_clips:
+                    break
+
+        final_highlights = sorted(
+            deduped,
+            key=lambda item: (
+                item.get("selection_score", 0),
+                item.get("analysis", {}).get("editorial_score", 0),
+                item.get("virality_score", 0),
+            ),
+            reverse=True,
+        )[:num_clips]
+
+        if len(final_highlights) < num_clips:
+            self.log(
+                f"\nWarning: only found {len(final_highlights)} valid clips out of {num_clips} requested."
+            )
+            self.log("  Model output was improved with local analysis, but the source still lacked strong windows.")
+
+        return final_highlights
     
     def process_clip(self, video_path: str, highlight: dict, index: int, total_clips: int = 1, add_captions: bool = True, add_hook: bool = True):
         """Process a single clip: cut, portrait, hook (optional), captions (optional)"""
@@ -1924,6 +2747,8 @@ Transcript:
             "start_time": highlight["start_time"],
             "end_time": highlight["end_time"],
             "duration_seconds": highlight["duration_seconds"],
+            "selection_score": highlight.get("selection_score"),
+            "analysis": highlight.get("analysis", {}),
             "has_hook": add_hook,
             "has_captions": add_captions,
             "has_watermark": self.watermark_settings.get("enabled", False),

@@ -14,9 +14,63 @@ MLBB_KEYWORDS = [
     "MANIAC",
     "TRIPLE KILL",
     "DOUBLE KILL",
+    "MEGA KILL",
+    "MONSTER KILL",
+    "KILLING SPREE",
+    "UNSTOPPABLE",
+    "GODLIKE",
+    "LEGENDARY",
+    "WIPED OUT",
+    "WIPE OUT",
     "SHUT DOWN",
     "HAS SLAIN",
+    "DESTROYED",
+    "TURRET",
+    "LORD",
+    "TURTLE",
 ]
+
+EVENT_TYPE_MAP = {
+    "SAVAGE": "multi_kill",
+    "MANIAC": "multi_kill",
+    "TRIPLE KILL": "multi_kill",
+    "DOUBLE KILL": "multi_kill",
+    "MEGA KILL": "streak",
+    "MONSTER KILL": "streak",
+    "KILLING SPREE": "streak",
+    "UNSTOPPABLE": "streak",
+    "GODLIKE": "streak",
+    "LEGENDARY": "streak",
+    "WIPED OUT": "teamfight",
+    "WIPE OUT": "teamfight",
+    "SHUT DOWN": "shutdown",
+    "HAS SLAIN": "pickoff",
+    "DESTROYED": "objective",
+    "TURRET": "objective",
+    "LORD": "objective",
+    "TURTLE": "objective",
+}
+
+HIT_WEIGHTS = {
+    "SAVAGE": 1.0,
+    "MANIAC": 0.92,
+    "TRIPLE KILL": 0.82,
+    "DOUBLE KILL": 0.65,
+    "MEGA KILL": 0.55,
+    "MONSTER KILL": 0.62,
+    "KILLING SPREE": 0.48,
+    "UNSTOPPABLE": 0.58,
+    "GODLIKE": 0.72,
+    "LEGENDARY": 0.9,
+    "WIPED OUT": 0.95,
+    "WIPE OUT": 0.95,
+    "SHUT DOWN": 0.7,
+    "HAS SLAIN": 0.32,
+    "DESTROYED": 0.42,
+    "TURRET": 0.38,
+    "LORD": 0.78,
+    "TURTLE": 0.6,
+}
 
 DEFAULT_ROIS = {
     "announcement": (0.20, 0.02, 0.80, 0.18),
@@ -99,6 +153,8 @@ def detect_ocr_hits(
                         "timestamp_sec": round(ts, 3),
                         "roi": roi_name,
                         "hits": sorted(set(hits)),
+                        "event_types": _classify_event_types(hits),
+                        "event_strength": round(float(_score_hits(hits)), 4),
                         "text": text[:200],
                         "burst": round(burst, 4),
                     }
@@ -110,6 +166,8 @@ def detect_ocr_hits(
                 "timestamp_sec": round(ts, 3),
                 "score": round(float(norm_score), 4),
                 "hits": sorted(set(frame_hits)),
+                "event_types": _classify_event_types(frame_hits),
+                "event_strength": round(float(_score_hits(frame_hits)), 4),
                 "burst": round(float(frame_burst_max), 4),
             }
         )
@@ -228,7 +286,30 @@ def _extract_hits(text: str) -> list[str]:
         hits.append("TRIPLE KILL")
     if "DOUBLE" in text and "KILL" in text and "DOUBLE KILL" not in hits:
         hits.append("DOUBLE KILL")
+    if "WIPE" in text and "OUT" in text and "WIPED OUT" not in hits and "WIPE OUT" not in hits:
+        hits.append("WIPED OUT")
+    if "LORD" in text and "LORD" not in hits:
+        hits.append("LORD")
+    if "TURTLE" in text and "TURTLE" not in hits:
+        hits.append("TURTLE")
+    if "DESTROYED" in text and "DESTROYED" not in hits:
+        hits.append("DESTROYED")
     return sorted(set(hits))
+
+
+def _classify_event_types(hits: list[str]) -> list[str]:
+    event_types = {EVENT_TYPE_MAP.get(str(hit).strip().upper(), "misc") for hit in hits}
+    event_types.discard("misc")
+    return sorted(event_types)
+
+
+def _score_hits(hits: list[str]) -> float:
+    if not hits:
+        return 0.0
+    strongest = max(HIT_WEIGHTS.get(str(hit).strip().upper(), 0.25) for hit in hits)
+    diversity_bonus = min(0.25, max(0, len(_classify_event_types(hits)) - 1) * 0.1)
+    count_bonus = min(0.2, max(0, len(set(hits)) - 1) * 0.05)
+    return min(1.0, strongest + diversity_bonus + count_bonus)
 
 
 def _calc_burst(
@@ -243,4 +324,3 @@ def _calc_burst(
         return 0.0
     diff = cv2.absdiff(current, prev)
     return float(np.mean(diff) / 255.0)
-

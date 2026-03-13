@@ -26,8 +26,14 @@ GAMEPLAY_HIT_KEYWORDS = {
     "MANIAC",
     "TRIPLE KILL",
     "DOUBLE KILL",
+    "WIPED OUT",
+    "WIPE OUT",
+    "LEGENDARY",
+    "GODLIKE",
     "SHUT DOWN",
     "HAS SLAIN",
+    "LORD",
+    "TURTLE",
 }
 
 DONATION_KEYWORDS = (
@@ -127,10 +133,22 @@ def classify_edit_template(
             ]
         )
     )
+    gameplay_analysis = clip.get("gameplay_analysis") or {}
     ocr_hits = {str(item).strip().upper() for item in (clip.get("ocr_hits") or [])}
+    ocr_hits.update(
+        str(item).strip().upper()
+        for item in (gameplay_analysis.get("priority_hits") or [])
+        if str(item).strip()
+    )
     motion = _as_float(clip.get("motion_score"))
     audio = _as_float(clip.get("audio_peak_score"))
     combo = _as_float(clip.get("combined_score"))
+    selection_score = _as_float(clip.get("selection_score"))
+    signal_density = _as_float(clip.get("signal_density"))
+    payoff_score = _as_float(clip.get("payoff_score"))
+    event_profile = str(clip.get("event_profile", "")).strip().lower()
+    action_grade = str(clip.get("action_grade", "")).strip().upper()
+    signal_reason = str(clip.get("signal_reason", "")).strip()
 
     scores = {name: 0.0 for name in ALL_TEMPLATES}
     reasons: list[str] = []
@@ -144,6 +162,24 @@ def classify_edit_template(
         scores[TEMPLATE_PRO_ENCOUNTER] += 0.8
         reasons.append(f"OCR hit gameplay: {sorted(ocr_hits.intersection(GAMEPLAY_HIT_KEYWORDS))}.")
 
+    if event_profile == "teamfight_explosion":
+        scores[TEMPLATE_GAMEPLAY_EPIC] += 3.0
+        scores[TEMPLATE_PRO_ENCOUNTER] += 0.7
+        reasons.append("Analisis gameplay membaca teamfight dengan payoff kuat.")
+    elif event_profile == "objective_swing":
+        scores[TEMPLATE_GAMEPLAY_EPIC] += 2.4
+        reasons.append("Analisis gameplay membaca objective swing.")
+    elif event_profile == "snowball_spike":
+        scores[TEMPLATE_GAMEPLAY_EPIC] += 2.1
+        scores[TEMPLATE_PRO_ENCOUNTER] += 0.9
+        reasons.append("Analisis gameplay membaca momentum snowball.")
+    elif event_profile == "pickoff_punish":
+        scores[TEMPLATE_GAMEPLAY_EPIC] += 1.8
+        reasons.append("Analisis gameplay membaca pickoff/shutdown.")
+    elif event_profile == "mechanical_outplay":
+        scores[TEMPLATE_GAMEPLAY_EPIC] += 2.6
+        reasons.append("Analisis gameplay membaca outplay mekanik.")
+
     if motion >= 0.65:
         scores[TEMPLATE_GAMEPLAY_EPIC] += 2.0
         reasons.append("Motion tinggi, cocok gameplay dominan.")
@@ -153,6 +189,18 @@ def classify_edit_template(
     if audio >= 0.65:
         scores[TEMPLATE_COMEDY_REACTION] += 0.7
         scores[TEMPLATE_TALK_HOTTAKE] += 0.4
+
+    if action_grade == "S":
+        scores[TEMPLATE_GAMEPLAY_EPIC] += 1.4
+    elif action_grade == "A":
+        scores[TEMPLATE_GAMEPLAY_EPIC] += 0.9
+
+    if selection_score >= 0.72:
+        scores[TEMPLATE_GAMEPLAY_EPIC] += 1.0
+    if signal_density >= 0.34:
+        scores[TEMPLATE_GAMEPLAY_EPIC] += 0.9
+    if payoff_score >= 0.62:
+        scores[TEMPLATE_GAMEPLAY_EPIC] += 0.8
 
     donation_hits = _keyword_hits(text, DONATION_KEYWORDS)
     talk_hits = _keyword_hits(text, TALK_KEYWORDS)
@@ -195,6 +243,8 @@ def classify_edit_template(
 
     if not reasons:
         reasons.append("Fallback ke heuristik score tertinggi.")
+    elif signal_reason:
+        reasons.append(signal_reason)
 
     hook_text = build_hook_text(template=template, clip=clip, transcript_text=transcript_text)
     hook_duration = HOOK_DURATION_BY_TEMPLATE.get(template, 2.0)
@@ -231,6 +281,45 @@ def build_hook_text(
     explicit = _normalize_ws(str(clip.get("hook_text", "")).strip())
     if explicit:
         return _truncate(explicit, 82)
+
+    ocr_hits = [
+        str(item).strip().upper()
+        for item in (clip.get("ocr_hits") or [])
+        if str(item).strip()
+    ]
+    if not ocr_hits:
+        gameplay_analysis = clip.get("gameplay_analysis") or {}
+        ocr_hits = [
+            str(item).strip().upper()
+            for item in (gameplay_analysis.get("priority_hits") or [])
+            if str(item).strip()
+        ]
+
+    event_profile = str(clip.get("event_profile", "")).strip().lower()
+    if ocr_hits:
+        primary = ocr_hits[0]
+        if primary in {"SAVAGE", "MANIAC", "TRIPLE KILL", "DOUBLE KILL"}:
+            return _truncate(f"{primary.title()} ini bikin lobby panik!", 82)
+        if primary in {"LORD", "TURTLE"}:
+            return _truncate(f"{primary.title()} fight ini penentu game!", 82)
+        if primary in {"WIPED OUT", "WIPE OUT"}:
+            return _truncate("Wipe out ini langsung jadi penutup!", 82)
+        if primary == "SHUT DOWN":
+            return _truncate("Shutdown ini langsung ubah tempo game!", 82)
+        if primary in {"LEGENDARY", "GODLIKE", "UNSTOPPABLE"}:
+            return _truncate(f"{primary.title()} moment yang bikin mental drop!", 82)
+
+    if event_profile:
+        profile_hooks = {
+            "teamfight_explosion": "Teamfight ini pecah banget di ending!",
+            "objective_swing": "Objective ini langsung balik momentum!",
+            "snowball_spike": "Momentum snowball di sini gila banget!",
+            "pickoff_punish": "Pickoff ini langsung ngubah game!",
+            "mechanical_outplay": "Outplay ini bersih banget!",
+            "gameplay_spike": "Momen ini bikin tensi langsung naik!",
+        }
+        if event_profile in profile_hooks:
+            return _truncate(profile_hooks[event_profile], 82)
 
     transcript = _normalize_ws(transcript_text)
     if transcript:
