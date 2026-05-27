@@ -145,7 +145,7 @@ class AutoClipperCore:
         system_prompt: str = None,
         watermark_settings: dict = None,
         credit_watermark_settings: dict = None,
-        face_tracking_mode: str = "opencv",
+        face_tracking_mode: str = "auto",
         mediapipe_settings: dict = None,
         ai_providers: dict = None,
         subtitle_language: str = "id",
@@ -208,7 +208,8 @@ class AutoClipperCore:
             "lip_activity_threshold": 0.15,
             "switch_threshold": 0.3,
             "min_shot_duration": 90,
-            "center_weight": 0.3
+            "center_weight": 0.3,
+            "auto_prefer_mediapipe": True,
         }
         self.subtitle_language = subtitle_language
         self.log = log_callback or print
@@ -2761,16 +2762,26 @@ Transcript:
     
     def convert_to_portrait(self, input_path: str, output_path: str):
         """Convert landscape to 9:16 portrait with speaker tracking (router method)"""
+        mode = (self.face_tracking_mode or "auto").lower()
         try:
-            if self.face_tracking_mode == "mediapipe":
+            if mode == "mediapipe":
                 self.log("  Using MediaPipe (Active Speaker Detection)")
                 return self.convert_to_portrait_mediapipe(input_path, output_path)
+            if mode == "auto":
+                if self.mediapipe_settings.get("auto_prefer_mediapipe", True):
+                    self.log("  Using Auto Mode (try MediaPipe first)")
+                    try:
+                        return self.convert_to_portrait_mediapipe(input_path, output_path)
+                    except Exception as auto_err:
+                        self.log(f"  Auto Mode fallback to OpenCV: {auto_err}")
+                self.log("  Using Auto Mode (OpenCV)")
+                return self.convert_to_portrait_opencv(input_path, output_path)
             else:
                 self.log("  Using OpenCV (Fast Mode)")
                 return self.convert_to_portrait_opencv(input_path, output_path)
         except Exception as e:
             # Fallback to OpenCV if MediaPipe fails
-            if self.face_tracking_mode == "mediapipe":
+            if mode == "mediapipe":
                 self.log(f"  ⚠ MediaPipe failed: {e}")
                 self.log("  Falling back to OpenCV mode...")
                 return self.convert_to_portrait_opencv(input_path, output_path)
@@ -3535,15 +3546,34 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
         
         events = []
+        emphasis_words = {
+            "SAVAGE", "MANIAC", "WIPED", "LORD", "TURTLE", "OUTPLAY", "CLUTCH",
+            "GG", "THROW", "COMEBACK", "SHUTDOWN", "GANK", "WAR", "PICKOFF"
+        }
         
         # Check if we have word-level timestamps
         if hasattr(transcript, 'words') and transcript.words:
             words = transcript.words
             
-            # Group words into chunks (3-4 words per line for readability)
-            chunk_size = 4
-            
-            for i in range(0, len(words), chunk_size):
+            i = 0
+            while i < len(words):
+                sample = words[i:i + 4]
+                if not sample:
+                    break
+                sample_start = getattr(sample[0], "start", 0) or 0
+                sample_end = getattr(sample[-1], "end", sample_start + 1.0) or (sample_start + 1.0)
+                sample_duration = max(0.2, sample_end - sample_start)
+                words_per_sec = len(sample) / sample_duration
+
+                if words_per_sec >= 3.2:
+                    chunk_size = 2
+                elif words_per_sec >= 2.4:
+                    chunk_size = 3
+                elif words_per_sec >= 1.6:
+                    chunk_size = 4
+                else:
+                    chunk_size = 5
+
                 chunk = words[i:i + chunk_size]
                 if not chunk:
                     continue
@@ -3558,9 +3588,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     text_parts = []
                     for k, w in enumerate(chunk):
                         word_text = w.word.strip().upper()
+                        clean_word = re.sub(r"[^A-Z0-9]", "", word_text)
                         if k == j:
                             # Highlight current word (yellow: &H00FFFF in BGR)
                             text_parts.append(f"{{\\c&H00FFFF&}}{word_text}{{\\c&HFFFFFF&}}")
+                        elif clean_word in emphasis_words:
+                            text_parts.append(f"{{\\b1}}{word_text}{{\\b0}}")
                         else:
                             text_parts.append(word_text)
                     
@@ -3571,6 +3604,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         'end': self.format_time(word_end),
                         'text': text
                     })
+                i += chunk_size
         
         # Fallback: use segment-level timestamps if no word timestamps
         elif hasattr(transcript, 'segments') and transcript.segments:

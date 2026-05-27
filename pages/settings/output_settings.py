@@ -56,7 +56,19 @@ class OutputSettingsSubPage(BaseSettingsSubPage):
         ctk.CTkLabel(tracking_frame, text="Choose how the video crops to speakers", 
             font=ctk.CTkFont(size=11), text_color="gray").pack(anchor="w", pady=(0, 10))
         
-        self.face_tracking_var = ctk.StringVar(value="opencv")
+        self.face_tracking_var = ctk.StringVar(value="auto")
+
+        # Auto option
+        auto_frame = ctk.CTkFrame(tracking_frame, fg_color=("gray85", "gray20"), corner_radius=8)
+        auto_frame.pack(fill="x", pady=(0, 10))
+        auto_radio = ctk.CTkRadioButton(auto_frame, text="Auto (Recommended)",
+            variable=self.face_tracking_var, value="auto",
+            font=ctk.CTkFont(size=13, weight="bold"))
+        auto_radio.pack(anchor="w", padx=15, pady=(10, 5))
+        ctk.CTkLabel(auto_frame, text="• Try MediaPipe active speaker first",
+            font=ctk.CTkFont(size=11), text_color="gray").pack(anchor="w", padx=35)
+        ctk.CTkLabel(auto_frame, text="• Automatically fallback to OpenCV if needed",
+            font=ctk.CTkFont(size=11), text_color="gray").pack(anchor="w", padx=35, pady=(0, 10))
         
         # OpenCV option
         opencv_frame = ctk.CTkFrame(tracking_frame, fg_color=("gray85", "gray20"), corner_radius=8)
@@ -132,7 +144,7 @@ class OutputSettingsSubPage(BaseSettingsSubPage):
         self.output_var.set(output_dir)
         
         # Face tracking mode
-        face_tracking = config_dict.get("face_tracking_mode", "opencv")
+        face_tracking = config_dict.get("face_tracking_mode", "auto")
         self.face_tracking_var.set(face_tracking)
     
     def save_settings(self):
